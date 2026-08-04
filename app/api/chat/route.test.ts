@@ -73,6 +73,7 @@ describe("POST /api/chat (health relay proxy)", () => {
         const body = JSON.parse(options.body as string);
         expect(body.app).toBe("health");
         expect(body.systemPrompt).toBe("mock system prompt");
+        expect(body.wantSummary).toBe(true);
         expect((options.headers as Record<string, string>)["X-Relay-Secret"]).toBe("test-secret");
     });
 

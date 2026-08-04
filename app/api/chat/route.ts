@@ -3,7 +3,7 @@ import { toSSELine } from "@gugbab/utils";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { buildSystemPrompt } from "@/lib/ai/context";
-import { BODY_LIMITS } from "@/lib/ai/limits";
+import { BODY_LIMITS, MESSAGE_LIMITS } from "@/lib/ai/limits";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -33,9 +33,14 @@ const UserContextSchema = z.object({
 
 const ChatRequestSchema = z.object({
     messages: z
-        .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(4000) }))
+        .array(
+            z.object({
+                role: z.enum(["user", "assistant"]),
+                content: z.string().min(1).max(MESSAGE_LIMITS.maxContentLength),
+            }),
+        )
         .min(1)
-        .max(50),
+        .max(MESSAGE_LIMITS.maxCount),
     context: UserContextSchema,
     // 형식만 검증하고 그대로 relay에 전달 — 모델 유효성의 단일 소스는 relay
     model: z.string().min(1).max(64).optional(),
@@ -99,6 +104,8 @@ export async function POST(req: NextRequest): Promise<Response> {
                 app: "health",
                 systemPrompt,
                 messages: parsed.messages,
+                // done 이벤트에 답변 요약을 실어달라는 요청 — 클라이언트 이력 압축에 사용
+                wantSummary: true,
                 ...(parsed.model ? { model: parsed.model } : {}),
             } satisfies RelayChatBody),
             signal: req.signal,

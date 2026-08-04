@@ -9,6 +9,7 @@ import ConversationListSheet from "@/components/chat/ConversationListSheet";
 import MealPlanModeBanner from "@/components/chat/MealPlanModeBanner";
 import ModelSheet from "@/components/chat/ModelSheet";
 import BottomNav from "@/components/layout/BottomNav";
+import { toOutgoingMessages } from "@/lib/ai/history";
 import { BODY_LIMITS, isInRange, type NumberRange } from "@/lib/ai/limits";
 import type { ModelInfo, ModelsResponse, UserContext } from "@/lib/ai/types";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -34,6 +35,8 @@ const FALLBACK_MODEL = "sonnet";
 const GENERIC_ERROR = "오류가 발생했어요. 잠시 후 다시 시도해주세요.";
 // 이 개수 미만이면 "보유 재료로만 vs 자유 추천" 선택을 강제한다 (대화방당 1회)
 const SCARCE_INGREDIENT_THRESHOLD = 3;
+// 시스템 프롬프트 "최근 식단 이력"에 넣을 다른 방 요약 최대 개수
+const RECENT_SUMMARY_COUNT = 5;
 
 // 과거 규칙으로 저장된 범위 밖 값이 채팅 400을 유발하지 않도록 컨텍스트에서 제외
 function sanitizeBodyValue(value: number | undefined, range: NumberRange): number | undefined {
@@ -87,6 +90,10 @@ export default function ChatPage() {
     const inputRef = useRef<HTMLInputElement>(null);
     // 전송 후 완료 시점에 확정할 메시지 목록 — null이면 대기 중인 응답 없음
     const pendingRef = useRef<ChatMessage[] | null>(null);
+    // done 이벤트로 수신한 답변 요약 — 확정 시 assistant 메시지에 부착
+    const summaryRef = useRef<string | undefined>(undefined);
+    // 방별 최신 답변 요약 — 다른 방 요약을 recentMealSummaries로 전달 (최신순)
+    const [roomSummaries, setRoomSummaries] = useState<Array<{ id: string; summary: string }>>([]);
     // 방 전환 세대 — 늦게 끝난 저장 콜백이 이전 방으로 상태를 되돌리는 것 방지
     const roomEpochRef = useRef(0);
 
@@ -97,7 +104,11 @@ export default function ChatPage() {
         inputRef.current?.focus();
     }, []);
 
-    const { text, status, send, abort } = useSSEChat({ url: "/api/chat", onError: handleError });
+    const handleDone = useCallback((event?: { type: "done"; summary?: string }) => {
+        summaryRef.current = event?.summary;
+    }, []);
+
+    const { text, status, send, abort } = useSSEChat({ url: "/api/chat", onDone: handleDone, onError: handleError });
     const streaming = status === "streaming";
 
     useEffect(() => {
@@ -125,11 +136,19 @@ export default function ChatPage() {
             }
 
             // 프로필 확인 후 추가 DB 읽기 — 실패해도 온보딩으로 보내지 않고 빈 값으로 처리
-            const [ingredients, metrics, latest] = await Promise.all([
+            const [ingredients, metrics, latest, allConversations] = await Promise.all([
                 getAllIngredients().catch(() => []),
                 getLatestBodyMetrics(7).catch(() => []),
                 restoreConversation(),
+                listConversations().catch(() => []),
             ]);
+            // 방별 마지막 답변 요약 수집 (목록은 최근 수정순)
+            setRoomSummaries(
+                allConversations.flatMap((c) => {
+                    const summary = c.messages.findLast((m) => m.role === "assistant" && m.summary)?.summary;
+                    return summary ? [{ id: c.id, summary }] : [];
+                }),
+            );
             setContext({
                 gender: profile.gender,
                 goals: profile.goals,
@@ -185,7 +204,12 @@ export default function ChatPage() {
     // 스트리밍 완료 시 어시스턴트 메시지 확정 + 대화방 저장
     useEffect(() => {
         if (status !== "done" || !pendingRef.current) return;
-        const finalMessages: ChatMessage[] = [...pendingRef.current, { role: "assistant", content: text }];
+        const summary = summaryRef.current;
+        summaryRef.current = undefined;
+        const finalMessages: ChatMessage[] = [
+            ...pendingRef.current,
+            { role: "assistant", content: text, ...(summary ? { summary } : {}) },
+        ];
         pendingRef.current = null;
         setMessages(finalMessages);
         const epoch = roomEpochRef.current;
@@ -195,6 +219,9 @@ export default function ChatPage() {
                 if (roomEpochRef.current !== epoch) return;
                 setConversationId(saved.id);
                 storeConversationRef(saved.id);
+                if (summary) {
+                    setRoomSummaries((prev) => [{ id: saved.id, summary }, ...prev.filter((r) => r.id !== saved.id)]);
+                }
             })
             .catch(() => undefined);
         inputRef.current?.focus();
@@ -227,11 +254,21 @@ export default function ChatPage() {
         const userMsg: ChatMessage = { role: "user", content: input.trim() };
         const nextMessages = [...messages, userMsg];
         pendingRef.current = nextMessages;
+        summaryRef.current = undefined;
         setMessages(nextMessages);
         setInput("");
-        const contextWithMode: UserContext = ingredientsScarce && mealPlanMode ? { ...context, mealPlanMode } : context;
+        // 현재 방 요약은 메시지 이력으로 이미 전달되므로 다른 방 요약만 담는다
+        const recentMealSummaries = roomSummaries
+            .filter((r) => r.id !== conversationId)
+            .map((r) => r.summary)
+            .slice(0, RECENT_SUMMARY_COUNT);
+        const contextWithMode: UserContext = {
+            ...(ingredientsScarce && mealPlanMode ? { ...context, mealPlanMode } : context),
+            recentMealSummaries,
+        };
+        // 긴 답변이 쌓여도 API 한도를 넘지 않도록 오래된 턴은 요약·절삭해 전송
         // 목록으로 검증된 경우에만 model 전달 — 미로드 시 relay 기본값에 위임 (폐기된 alias 전송 방지)
-        send({ messages: nextMessages, context: contextWithMode, ...(models ? { model } : {}) });
+        send({ messages: toOutgoingMessages(nextMessages), context: contextWithMode, ...(models ? { model } : {}) });
     }
 
     function handleNewChat() {
@@ -278,6 +315,7 @@ export default function ChatPage() {
             return;
         }
         setConversations((prev) => prev.filter((c) => c.id !== id));
+        setRoomSummaries((prev) => prev.filter((r) => r.id !== id));
         if (deletingActive) {
             // 현재 열려 있던 방을 지우면 새 대화 상태로 초기화
             handleNewChat();
