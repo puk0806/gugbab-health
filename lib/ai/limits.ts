@@ -7,6 +7,13 @@ export const BODY_LIMITS = {
     skeletalMuscleKg: { min: 1, max: 100 },
 } as const;
 
+// 채팅 이력 전송 한도 — /api/chat zod 스키마와 클라이언트 이력 압축(history.ts)이 반드시 이 상수를 공유한다.
+// (클라이언트가 통과시킨 이력을 API가 거부하는 정합성 함정 방지)
+export const MESSAGE_LIMITS = {
+    maxContentLength: 4000,
+    maxCount: 50,
+} as const;
+
 export interface NumberRange {
     min: number;
     max: number;

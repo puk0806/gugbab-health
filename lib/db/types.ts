@@ -33,6 +33,8 @@ export interface BodyMetric {
 export interface ChatMessage {
     role: "user" | "assistant";
     content: string;
+    /** relay가 내려준 답변 요약 — 오래된 턴을 압축 전송할 때 원문 대신 사용 (assistant 전용) */
+    summary?: string;
 }
 
 export type MealPlanMode = "pantry-only" | "free";

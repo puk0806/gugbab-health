@@ -12,8 +12,8 @@ importers:
         specifier: ^1.0.0
         version: 1.52.0
       '@gugbab/hooks':
-        specifier: 1.1.0
-        version: 1.1.0(react@19.2.4)
+        specifier: 1.2.0
+        version: 1.2.0(react@19.2.4)
       '@gugbab/styled-radix':
         specifier: 1.0.2
         version: 1.0.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -21,8 +21,8 @@ importers:
         specifier: 1.0.0
         version: 1.0.0
       '@gugbab/utils':
-        specifier: 1.1.0
-        version: 1.1.0
+        specifier: 1.2.0
+        version: 1.2.0
       '@serwist/next':
         specifier: ^9.5.11
         version: 9.5.11(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
@@ -52,8 +52,8 @@ importers:
         specifier: 1.0.1
         version: 1.0.1(@biomejs/biome@2.5.1)
       '@gugbab/relay-types':
-        specifier: latest
-        version: 1.0.0-202607081514
+        specifier: 1.0.0-202608031427
+        version: 1.0.0-202608031427
       '@playwright/test':
         specifier: 1.60.0
         version: 1.60.0
@@ -513,14 +513,14 @@ packages:
     peerDependencies:
       react: '>=18'
 
-  '@gugbab/hooks@1.1.0':
-    resolution: {integrity: sha512-/3VjgxXmIEtHgBnLDPTIsCyj7e/Dmd5hmlk78/C7QeV6HpJg1eymKxF06bqKqntuVri3NJEdQ8DlGHKNNnBJ8Q==}
+  '@gugbab/hooks@1.2.0':
+    resolution: {integrity: sha512-ixdi2gQfoZahc/oydOB8iwBf8R+oxBxKOTERao36ikDo6lW94KqKj7bMXee0RCZ8Tc8P1xOZsPBl8DhT6sArZQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       react: '>=18'
 
-  '@gugbab/relay-types@1.0.0-202607081514':
-    resolution: {integrity: sha512-W6WtslghzJZUZ3Wij02v6+Prd5WtsybR9VDwjGJvSZoDfpcMsLoz1sKNFzdExBdBoUkGRQYVPBaREAq8pv2HRQ==}
+  '@gugbab/relay-types@1.0.0-202608031427':
+    resolution: {integrity: sha512-mYkiyxhteafHbPl6/EimreEJDytDtuJy9Nwi+Qls2irpjtEriTrmKsbcKACwaavxzW7NXxrPWaopuUHMaZulwA==}
     engines: {node: '>=18.0.0'}
 
   '@gugbab/styled-radix@1.0.2':
@@ -538,8 +538,8 @@ packages:
     resolution: {integrity: sha512-yRYXHqXktj/9a4XwjEPN1R62hZjSghh6+qLJJUa1uLtitV8SNYlBYP9m9mlvGj/ZI/o6joBJQ3eqQcpck2WW5Q==}
     engines: {node: '>=18.0.0'}
 
-  '@gugbab/utils@1.1.0':
-    resolution: {integrity: sha512-1elhF/guMFa4EWL5OSVm3SvW7ZOzWCME9XfZ7KWyykCdgak75ZLb4oSVbphySiq+zkG+uVNI6DxV9RbzGcodYw==}
+  '@gugbab/utils@1.2.0':
+    resolution: {integrity: sha512-o/3y83dk9+9GiiySPIfs0aCrF7Jc6L5yyP8/OB1oBLmXI+eWGtmOa6iWj98s8uWlInMsePFMCqTgYiac+tbXpA==}
     engines: {node: '>=18.0.0'}
 
   '@img/colour@1.1.0':
@@ -2229,12 +2229,12 @@ snapshots:
       '@gugbab/utils': 1.0.1
       react: 19.2.4
 
-  '@gugbab/hooks@1.1.0(react@19.2.4)':
+  '@gugbab/hooks@1.2.0(react@19.2.4)':
     dependencies:
-      '@gugbab/utils': 1.1.0
+      '@gugbab/utils': 1.2.0
       react: 19.2.4
 
-  '@gugbab/relay-types@1.0.0-202607081514': {}
+  '@gugbab/relay-types@1.0.0-202608031427': {}
 
   '@gugbab/styled-radix@1.0.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
@@ -2248,7 +2248,7 @@ snapshots:
 
   '@gugbab/utils@1.0.1': {}
 
-  '@gugbab/utils@1.1.0': {}
+  '@gugbab/utils@1.2.0': {}
 
   '@img/colour@1.1.0': {}
 
