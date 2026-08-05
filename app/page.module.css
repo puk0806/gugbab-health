@@ -122,6 +122,24 @@
   white-space: nowrap;
 }
 
+.jumpToBottom {
+  position: fixed;
+  right: 16px;
+  /* 입력바+하단내비(≈88px) 바로 위, 홈 인디케이터 안전영역 반영 */
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  z-index: 40;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--gugbab-color-border-subtle);
+  background: var(--gugbab-color-bg-surface);
+  color: var(--gugbab-color-fg-primary);
+  font-size: 1.125rem;
+  line-height: 1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+}
+
 .toast {
   position: fixed;
   left: 50%;
