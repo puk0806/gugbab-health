@@ -37,6 +37,8 @@ const GENERIC_ERROR = "오류가 발생했어요. 잠시 후 다시 시도해주
 const SCARCE_INGREDIENT_THRESHOLD = 3;
 // 시스템 프롬프트 "최근 식단 이력"에 넣을 다른 방 요약 최대 개수
 const RECENT_SUMMARY_COUNT = 5;
+// 하단에서 이만큼 이상 올라가면 자동 스크롤을 멈추고 최하단 이동 버튼을 띄운다
+const JUMP_BUTTON_THRESHOLD = 160;
 
 // 과거 규칙으로 저장된 범위 밖 값이 채팅 400을 유발하지 않도록 컨텍스트에서 제외
 function sanitizeBodyValue(value: number | undefined, range: NumberRange): number | undefined {
@@ -87,6 +89,12 @@ export default function ChatPage() {
     const [toast, setToast] = useState<string | null>(null);
     const bindLongPress = useLongPress();
     const bottomRef = useRef<HTMLDivElement>(null);
+    const messagesRef = useRef<HTMLDivElement>(null);
+    // 하단 근접 여부 — 자동 스크롤 유지 조건. 렌더와 무관하게 스크롤마다 갱신되므로 ref
+    const nearBottomRef = useRef(true);
+    const [showJumpBtn, setShowJumpBtn] = useState(false);
+    // 방 전환 신호 — 새 방 첫 저장의 id 부여(null→id)를 방 전환으로 오인하지 않도록 명시적으로 올린다
+    const [roomSwitchKey, setRoomSwitchKey] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
     // 전송 후 완료 시점에 확정할 메시지 목록 — null이면 대기 중인 응답 없음
     const pendingRef = useRef<ChatMessage[] | null>(null);
@@ -167,6 +175,7 @@ export default function ChatPage() {
                 setConversationId(latest.id);
                 setMessages(latest.messages);
                 setMealPlanMode(latest.mealPlanMode ?? null);
+                setRoomSwitchKey((k) => k + 1);
             }
         }
         init().catch(() => router.replace("/onboarding"));
@@ -227,9 +236,31 @@ export default function ChatPage() {
         inputRef.current?.focus();
     }, [status, text, conversationId, mealPlanMode]);
 
+    // 하단 근처일 때만 자동 스크롤 — 위로 올려 과거 메시지를 읽는 중에는 방해하지 않는다
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        if (nearBottomRef.current) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, text]);
+
+    // 방 전환·초기 로드 시에는 항상 최하단에서 시작
+    useEffect(() => {
+        nearBottomRef.current = true;
+        setShowJumpBtn(false);
+        bottomRef.current?.scrollIntoView({ behavior: "auto" });
+    }, [roomSwitchKey]);
+
+    function handleMessagesScroll() {
+        const el = messagesRef.current;
+        if (!el) return;
+        const near = el.scrollHeight - el.scrollTop - el.clientHeight < JUMP_BUTTON_THRESHOLD;
+        nearBottomRef.current = near;
+        setShowJumpBtn(!near);
+    }
+
+    function scrollToBottom() {
+        nearBottomRef.current = true;
+        setShowJumpBtn(false);
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
 
     // 토스트는 잠깐 보여주고 자동으로 사라진다
     useEffect(() => {
@@ -255,6 +286,9 @@ export default function ChatPage() {
         const nextMessages = [...messages, userMsg];
         pendingRef.current = nextMessages;
         summaryRef.current = undefined;
+        // 전송 시에는 위로 올려둔 상태여도 최신 메시지로 따라간다
+        nearBottomRef.current = true;
+        setShowJumpBtn(false);
         setMessages(nextMessages);
         setInput("");
         // 현재 방 요약은 메시지 이력으로 이미 전달되므로 다른 방 요약만 담는다
@@ -278,6 +312,7 @@ export default function ChatPage() {
         setConversationId(null);
         setMessages([]);
         setMealPlanMode(null);
+        setRoomSwitchKey((k) => k + 1);
         storeConversationRef(NEW_CONVERSATION_REF);
     }
 
@@ -297,6 +332,7 @@ export default function ChatPage() {
         setConversationId(conversation.id);
         setMessages(conversation.messages);
         setMealPlanMode(conversation.mealPlanMode ?? null);
+        setRoomSwitchKey((k) => k + 1);
         storeConversationRef(conversation.id);
         setListOpen(false);
     }
@@ -367,7 +403,7 @@ export default function ChatPage() {
                 </button>
             </header>
 
-            <div className={styles.messages}>
+            <div className={styles.messages} ref={messagesRef} onScroll={handleMessagesScroll}>
                 {messages.length === 0 && !streaming && (
                     <div className={styles.empty}>
                         <p>
@@ -396,6 +432,17 @@ export default function ChatPage() {
                 )}
                 <div ref={bottomRef} />
             </div>
+
+            {showJumpBtn && (
+                <button
+                    type="button"
+                    className={styles.jumpToBottom}
+                    onClick={scrollToBottom}
+                    aria-label="최신 메시지로 이동"
+                >
+                    ↓
+                </button>
+            )}
 
             {sheetOpen && models && (
                 <ModelSheet
