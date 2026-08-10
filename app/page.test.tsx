@@ -530,6 +530,12 @@ describe("ChatPage", () => {
             );
         });
 
+        it("모드 선택 후 입력창으로 포커스를 되돌린다", async () => {
+            await renderAndWaitInput();
+            fireEvent.click(screen.getByRole("button", { name: "보유 재료로만" }));
+            expect(screen.getByPlaceholderText("식단을 요청해보세요...")).toHaveFocus();
+        });
+
         it("식재료가 풍부하면 배너 없이 바로 전송 가능하다", async () => {
             vi.mocked(getAllIngredients).mockResolvedValue(PLENTIFUL_INGREDIENTS);
             await renderAndWaitInput();
