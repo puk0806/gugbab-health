@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ChatInputBar from "@/components/chat/ChatInputBar";
 import ConversationListSheet from "@/components/chat/ConversationListSheet";
-import MealPlanModeBanner from "@/components/chat/MealPlanModeBanner";
+import MealPlanModeSheet from "@/components/chat/MealPlanModeSheet";
 import ModelSheet from "@/components/chat/ModelSheet";
 import BottomNav from "@/components/layout/BottomNav";
 import { toOutgoingMessages } from "@/lib/ai/history";
@@ -237,11 +237,13 @@ export default function ChatPage() {
     }, [status, text, conversationId, mealPlanMode]);
 
     // 하단 근처일 때만 자동 스크롤 — 위로 올려 과거 메시지를 읽는 중에는 방해하지 않는다
+    // biome-ignore lint/correctness/useExhaustiveDependencies: messages·text는 새 내용 도착 시점을 잡는 트리거 의존성 (본문은 ref만 읽음)
     useEffect(() => {
         if (nearBottomRef.current) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, text]);
 
     // 방 전환·초기 로드 시에는 항상 최하단에서 시작
+    // biome-ignore lint/correctness/useExhaustiveDependencies: roomSwitchKey는 방 전환 시점을 잡는 트리거 의존성
     useEffect(() => {
         nearBottomRef.current = true;
         setShowJumpBtn(false);
@@ -360,6 +362,8 @@ export default function ChatPage() {
 
     function handleSelectMode(mode: MealPlanMode) {
         setMealPlanMode(mode);
+        // 강제 선택 시트가 포커스를 가져갔으므로, 닫힌 뒤 바로 입력할 수 있게 되돌린다
+        inputRef.current?.focus();
         // 이미 저장된 방이면 선택 즉시 영속화 (새 방은 첫 저장 시 함께 기록)
         if (conversationId) {
             saveConversation({ id: conversationId, messages, mealPlanMode: mode }).catch(() => undefined);
@@ -415,6 +419,7 @@ export default function ChatPage() {
                 )}
                 {messages.map((msg, i) => (
                     <div
+                        // biome-ignore lint/suspicious/noArrayIndexKey: 메시지는 방 안에서 append-only라 순서가 안정적 (id 없음)
                         key={i}
                         className={msg.role === "user" ? styles.userBubble : styles.assistantBubble}
                         {...bindLongPress(({ x, y }) => setCopyMenu({ content: msg.content, x, y }))}
@@ -463,7 +468,7 @@ export default function ChatPage() {
                 />
             )}
 
-            {needsModeChoice && <MealPlanModeBanner onSelect={handleSelectMode} />}
+            {needsModeChoice && <MealPlanModeSheet onSelect={handleSelectMode} />}
 
             <ChatInputBar
                 value={input}
