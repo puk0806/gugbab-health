@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ab20dba6-df2f-4b12-a539-1a28bb20553a
-  modified: 2026-08-14T07:20:45.120Z
+  modified: 2026-08-14T07:49:50.886Z
 ---
 
 2026-08-14, relay 입력 상한 대응(wantSummary 이력 압축)을 health와
@@ -25,7 +25,15 @@ dream(03_gugbab-claude-dream) 두 앱이 각자 구현한 것을 이 세션에�
 - 재시도 시 바이트 예산도 절반(`RETRY_BUDGET_BYTES = 45_000`)으로 축소
 - 상세 스토리는 dream 레포 `memory/project_history_v3_cross_review.md`에 기록
 
-검증: health 테스트 215개·dream 115개 전부 통과, 양쪽 tsc·biome 클린.
+2차 재점검(같은 날)에서 health에 추가 보완: ① done summary 런타임 문자열
+가드(page.tsx), ② systemPrompt 20,000자 상한 사전 방어 —
+`trimContextForPrompt`(context.ts, goals 중복 제거 + metrics/ingredients/summaries
+절삭), ③ dream의 adversarial 테스트 3종 이식(__proto__ 오염·스택 미노출·시크릿
+미노출), ④ 재시도 개수 축소 `RETRY_MAX_MESSAGES = 5`. goals 무제한 이슈는
+Codex 리뷰가 발견(ACCEPT). dream 세션은 이후 활동 재개해 자체적으로 다듬는 중
+(KEEP_RECENT_TURNS 3으로 조정 등) — dream 쪽은 그 세션 소관.
+
+검증: health 테스트 222개·dream 115개 전부 통과, 양쪽 tsc 클린.
 양쪽 모두 미커밋 상태 — dream은 `feature/relay-input-limits` 브랜치(그쪽 세션의
 기존 미커밋 변경 위), health는 main 워킹 트리. 커밋은 사용자 요청 대기.
 
