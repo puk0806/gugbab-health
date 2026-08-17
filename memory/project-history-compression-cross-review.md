@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ab20dba6-df2f-4b12-a539-1a28bb20553a
-  modified: 2026-08-14T07:49:50.886Z
+  modified: 2026-08-17T23:59:12.469Z
 ---
 
 2026-08-14, relay 입력 상한 대응(wantSummary 이력 압축)을 health와
@@ -33,7 +33,21 @@ dream(03_gugbab-claude-dream) 두 앱이 각자 구현한 것을 이 세션에�
 Codex 리뷰가 발견(ACCEPT). dream 세션은 이후 활동 재개해 자체적으로 다듬는 중
 (KEEP_RECENT_TURNS 3으로 조정 등) — dream 쪽은 그 세션 소관.
 
-검증: health 테스트 222개·dream 115개 전부 통과, 양쪽 tsc 클린.
+3차 일괄 점검(2026-08-14~18, 사용자 요청 "관점 다른 리뷰어로 한번에"): 리뷰어
+3명 병렬(로직·계약 정합·데이터 손실) + Codex 반복 라운드로 수렴시킴. 반영:
+① relay-types 1.0.0-202608141124 범프(violation 정식 타입), ② MetricSchema
+BODY_LIMITS bound + trimContextForPrompt 숫자 round2(무제한 숫자 직렬화로
+프롬프트 상한 20,031자 초과하던 실측 구멍), ③ **빈 content assistant 저장 시
+방 영구 브릭** 수정 — 전송 필터 + 빈 done은 확정·저장 생략, ④ transient
+메시지 개념 신설(ChatMessage.transient) — 에러 버블·미응답 user 턴을 화면에만
+남기고 저장·전송 제외(이력 오염·연속 user 턴 방지, mealPlanMode 저장 경로
+포함), ⑤ zod refine 첫·마지막 user 거부, ⑥ appendTranscript 추출 + 서로게이트
+절단 방어, ⑦ 범위 밖 레거시 metric 클라이언트 필터(400 브릭 방지), ⑧
+KEEP_RECENT_TURNS 3. 교훈: 스크래치 디렉토리에서 pnpm add가 실행되어 범프가
+누락된 적 있음 — 패키지 설치는 반드시 레포 루트 cd 후 실행.
+
+검증: health 테스트 232개·dream 115개 전부 통과, 양쪽 tsc 클린, Codex 최종
+라운드 무지적 수렴 (2026-08-18).
 양쪽 모두 미커밋 상태 — dream은 `feature/relay-input-limits` 브랜치(그쪽 세션의
 기존 미커밋 변경 위), health는 main 워킹 트리. 커밋은 사용자 요청 대기.
 
