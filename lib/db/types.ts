@@ -35,6 +35,8 @@ export interface ChatMessage {
     content: string;
     /** relay가 내려준 답변 요약 — 오래된 턴을 압축 전송할 때 원문 대신 사용 (assistant 전용) */
     summary?: string;
+    /** UI 전용 임시 메시지(에러 안내 버블 등) — DB 저장·relay 전송에서 제외 */
+    transient?: boolean;
 }
 
 export type MealPlanMode = "pantry-only" | "free";

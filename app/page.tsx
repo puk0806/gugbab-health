@@ -10,7 +10,7 @@ import MealPlanModeSheet from "@/components/chat/MealPlanModeSheet";
 import ModelSheet from "@/components/chat/ModelSheet";
 import BottomNav from "@/components/layout/BottomNav";
 import { toOutgoingMessages } from "@/lib/ai/history";
-import { BODY_LIMITS, isInRange, type NumberRange } from "@/lib/ai/limits";
+import { BODY_LIMITS, isInRange, MESSAGE_LIMITS, type NumberRange } from "@/lib/ai/limits";
 import type { ModelInfo, ModelsResponse, UserContext } from "@/lib/ai/types";
 import { copyToClipboard } from "@/lib/clipboard";
 import { getLatestBodyMetrics } from "@/lib/db/bodyMetrics";
@@ -105,15 +105,29 @@ export default function ChatPage() {
     // 방 전환 세대 — 늦게 끝난 저장 콜백이 이전 방으로 상태를 되돌리는 것 방지
     const roomEpochRef = useRef(0);
 
-    const handleError = useCallback((err: Error | { type: "error"; message: string }) => {
+    // 응답을 받지 못한 요청의 마무리 — 방금 보낸 user 턴을 transient로 전환(화면 유지,
+    // 저장·전송 제외)하고 안내 버블을 붙인다. 미응답 질문이 다음 전송 이력에 끼어
+    // 연속 user 턴으로 relay에 전달되는 것을 방지한다
+    const settleFailedTurn = useCallback((notice: string) => {
         pendingRef.current = null;
-        const message = err instanceof Error ? GENERIC_ERROR : err.message;
-        setMessages((prev) => [...prev, { role: "assistant", content: message }]);
+        setMessages((prev) => [
+            ...prev.map((m, i) => (i === prev.length - 1 && m.role === "user" ? { ...m, transient: true } : m)),
+            { role: "assistant", content: notice, transient: true },
+        ]);
         inputRef.current?.focus();
     }, []);
 
+    const handleError = useCallback(
+        (err: Error | { type: "error"; message: string }) => {
+            settleFailedTurn(err instanceof Error ? GENERIC_ERROR : err.message);
+        },
+        [settleFailedTurn],
+    );
+
     const handleDone = useCallback((event?: { type: "done"; summary?: string }) => {
-        summaryRef.current = event?.summary;
+        // relay 계약상 문자열이지만 런타임 방어 — 비문자열·빈 문자열은 없는 것으로 취급 (원문 유지 폴백)
+        const summary = event?.summary;
+        summaryRef.current = typeof summary === "string" && summary ? summary : undefined;
     }, []);
 
     const { text, status, send, abort } = useSSEChat({ url: "/api/chat", onDone: handleDone, onError: handleError });
@@ -162,12 +176,17 @@ export default function ChatPage() {
                 goals: profile.goals,
                 heightCm: sanitizeBodyValue(profile.heightCm, BODY_LIMITS.heightCm),
                 weightKg: sanitizeBodyValue(profile.weightKg, BODY_LIMITS.weightKg),
-                recentMetrics: [...metrics].reverse().map((m) => ({
-                    date: m.date,
-                    weight: m.weight,
-                    bodyFatPct: m.bodyFatPct,
-                    skeletalMuscleMass: m.skeletalMuscleMass,
-                })),
+                // 범위 밖 레거시 지표 방어 — API zod가 BODY_LIMITS로 거부하므로,
+                // weight가 범위 밖이면 항목을 제외하고 선택 필드는 범위 밖 값만 제거한다
+                recentMetrics: [...metrics]
+                    .reverse()
+                    .filter((m) => isInRange(m.weight, BODY_LIMITS.weightKg))
+                    .map((m) => ({
+                        date: m.date,
+                        weight: m.weight,
+                        bodyFatPct: sanitizeBodyValue(m.bodyFatPct, BODY_LIMITS.bodyFatPct),
+                        skeletalMuscleMass: sanitizeBodyValue(m.skeletalMuscleMass, BODY_LIMITS.skeletalMuscleKg),
+                    })),
                 ingredients: ingredients.map((i) => ({ name: i.name, category: i.category })),
                 recentMealSummaries: [],
             });
@@ -215,6 +234,12 @@ export default function ChatPage() {
         if (status !== "done" || !pendingRef.current) return;
         const summary = summaryRef.current;
         summaryRef.current = undefined;
+        // 빈 응답(chunk 없이 done)은 확정·저장하지 않고 에러 경로와 동일하게 처리한다.
+        // 빈 content가 저장되면 이후 모든 전송이 API 검증(min 1)에 걸려 방이 영구 전송 불가가 된다
+        if (!text) {
+            settleFailedTurn("응답을 받지 못했어요. 다시 시도해주세요.");
+            return;
+        }
         const finalMessages: ChatMessage[] = [
             ...pendingRef.current,
             { role: "assistant", content: text, ...(summary ? { summary } : {}) },
@@ -222,7 +247,9 @@ export default function ChatPage() {
         pendingRef.current = null;
         setMessages(finalMessages);
         const epoch = roomEpochRef.current;
-        saveConversation({ id: conversationId, messages: finalMessages, mealPlanMode })
+        // transient(에러 안내 버블)는 화면에만 남기고 DB에는 저장하지 않는다
+        const persistable = finalMessages.filter((m) => !m.transient);
+        saveConversation({ id: conversationId, messages: persistable, mealPlanMode })
             .then((saved) => {
                 // 저장 중 방이 전환됐으면 이전 방으로 재바인딩하지 않는다
                 if (roomEpochRef.current !== epoch) return;
@@ -234,7 +261,7 @@ export default function ChatPage() {
             })
             .catch(() => undefined);
         inputRef.current?.focus();
-    }, [status, text, conversationId, mealPlanMode]);
+    }, [status, text, conversationId, mealPlanMode, settleFailedTurn]);
 
     // 하단 근처일 때만 자동 스크롤 — 위로 올려 과거 메시지를 읽는 중에는 방해하지 않는다
     // biome-ignore lint/correctness/useExhaustiveDependencies: messages·text는 새 내용 도착 시점을 잡는 트리거 의존성 (본문은 ref만 읽음)
@@ -365,8 +392,13 @@ export default function ChatPage() {
         // 강제 선택 시트가 포커스를 가져갔으므로, 닫힌 뒤 바로 입력할 수 있게 되돌린다
         inputRef.current?.focus();
         // 이미 저장된 방이면 선택 즉시 영속화 (새 방은 첫 저장 시 함께 기록)
+        // transient(에러 안내 버블)는 확정 저장 경로와 동일하게 제외한다
         if (conversationId) {
-            saveConversation({ id: conversationId, messages, mealPlanMode: mode }).catch(() => undefined);
+            saveConversation({
+                id: conversationId,
+                messages: messages.filter((m) => !m.transient),
+                mealPlanMode: mode,
+            }).catch(() => undefined);
         }
     }
 
@@ -476,6 +508,7 @@ export default function ChatPage() {
                 onSend={handleSend}
                 disabled={streaming}
                 sendBlocked={needsModeChoice}
+                maxLength={MESSAGE_LIMITS.maxContentLength}
                 inputRef={inputRef}
             />
 

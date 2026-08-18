@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MicError } from "@/lib/speech";
-import ChatInputBar from "./ChatInputBar";
+import ChatInputBar, { appendTranscript } from "./ChatInputBar";
 
 interface RecognizerInstance {
     onResult: (text: string, isFinal: boolean) => void;
@@ -152,5 +152,33 @@ describe("ChatInputBar", () => {
         render(<ChatInputBar {...baseProps()} disabled />);
         expect(screen.getByPlaceholderText("식단을 요청해보세요...")).toBeDisabled();
         expect(screen.getByRole("button", { name: "음성 입력" })).toBeDisabled();
+    });
+});
+
+describe("appendTranscript", () => {
+    it("기존 입력에 공백으로 이어붙이고, 빈 입력이면 그대로 시작한다", () => {
+        expect(appendTranscript("", "닭가슴살", 100)).toBe("닭가슴살");
+        expect(appendTranscript("오늘", "식단 추천", 100)).toBe("오늘 식단 추천");
+    });
+
+    it("상한을 넘으면 잘라낸다 (프로그램적 입력은 maxLength 속성을 우회하므로)", () => {
+        const out = appendTranscript("가".repeat(10), "나".repeat(10), 15);
+        expect(out.length).toBe(15);
+    });
+
+    it("절단 지점이 이모지(서로게이트 쌍) 중간이면 깨진 문자를 남기지 않는다", () => {
+        // "가나다라 🍗" = 7코드유닛("🍗"는 2유닛) — max 6은 이모지 중간을 자른다
+        const out = appendTranscript("가나다라", "🍗", 6);
+        expect(out).toBe("가나다라 ");
+        expect(
+            out.split("").every((c) => {
+                const code = c.charCodeAt(0);
+                return code < 0xd800 || code > 0xdfff;
+            }),
+        ).toBe(true);
+    });
+
+    it("상한 미지정이면 자르지 않는다", () => {
+        expect(appendTranscript("가".repeat(10), "나".repeat(10))).toHaveLength(21);
     });
 });
