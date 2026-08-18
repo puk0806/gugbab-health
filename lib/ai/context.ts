@@ -1,4 +1,50 @@
+import { uniq } from "@gugbab/utils";
 import type { UserContext } from "./types";
+
+/**
+ * systemPrompt가 relay 상한(MAX_CUSTOM_PROMPT_CHARS, 20,000자)을 넘지 않도록
+ * 컨텍스트 배열을 프롬프트 생성 전에 잘라내는 상한.
+ * systemPrompt 초과 400은 history-budget 재시도로 복구되지 않는 유형이라 사전 방어가 유일한 수단.
+ * zod 거부 대신 조용한 절삭 — 데이터가 커도 채팅 자체가 막히지 않게 한다.
+ */
+export const PROMPT_CONTEXT_LIMITS = {
+    maxRecentMetrics: 62, // 약 두 달치
+    maxIngredients: 120,
+    maxIngredientNameLength: 50,
+    maxMetricDateLength: 32,
+    maxRecentMealSummaries: 10,
+    maxSummaryLength: 500, // relay 요약 계약(300자 이내)의 여유 상한
+} as const;
+
+// 소수 2자리 반올림 — JS 숫자는 직렬화가 최대 24자까지 길어질 수 있어
+// (예: 499.99999999999994) 프롬프트 길이 상한 보장을 깨뜨린다
+function round2(n: number): number {
+    return Math.round(n * 100) / 100;
+}
+
+/** 프롬프트 생성 전 컨텍스트 배열·문자열·숫자 정밀도를 상한 내로 잘라낸다 */
+export function trimContextForPrompt(ctx: UserContext): UserContext {
+    const L = PROMPT_CONTEXT_LIMITS;
+    return {
+        ...ctx,
+        // enum 값이지만 배열 개수는 무제한 — 중복 제거로 enum 종류 수(5)를 자연 상한으로 만든다
+        goals: uniq(ctx.goals),
+        recentMetrics: ctx.recentMetrics.slice(0, L.maxRecentMetrics).map((m) => ({
+            ...m,
+            date: m.date.slice(0, L.maxMetricDateLength),
+            weight: round2(m.weight),
+            ...(m.bodyFatPct !== undefined ? { bodyFatPct: round2(m.bodyFatPct) } : {}),
+            ...(m.skeletalMuscleMass !== undefined ? { skeletalMuscleMass: round2(m.skeletalMuscleMass) } : {}),
+        })),
+        // ingredients는 addedAt 오름차순(오래된 것 먼저)으로 오므로 뒤에서 잘라 최신 항목을 보존한다
+        ingredients: ctx.ingredients
+            .slice(-L.maxIngredients)
+            .map((i) => ({ ...i, name: i.name.slice(0, L.maxIngredientNameLength) })),
+        recentMealSummaries: ctx.recentMealSummaries
+            .slice(0, L.maxRecentMealSummaries)
+            .map((s) => s.slice(0, L.maxSummaryLength)),
+    };
+}
 
 const GOAL_LABELS: Record<string, string> = {
     "lose-weight": "체중 감량",
@@ -59,8 +105,7 @@ export function buildSystemPrompt(ctx: UserContext): string {
                   .join("\n")
             : "등록된 식재료 없음";
 
-    const mealHistorySection =
-        ctx.recentMealSummaries.length > 0 ? ctx.recentMealSummaries.join("\n") : "없음";
+    const mealHistorySection = ctx.recentMealSummaries.length > 0 ? ctx.recentMealSummaries.join("\n") : "없음";
 
     const mealPlanGuide = ctx.mealPlanMode
         ? MEAL_PLAN_MODE_GUIDES[ctx.mealPlanMode]

@@ -11,3 +11,4 @@
 - [완료 보고 전 검증 의무](feedback-e2e-verification-before-report.md) — CI/CD 플로우 등 크리티컬 패스는 직접 검증 후 보고
 - [검증 후 안내 의무](feedback-verify-before-guiding.md) — UI 조작법·사실 안내는 문서/실측 검증 후, 실패한 안내 반복 금지
 - [브랜치 전 fetch 필수](feedback-fetch-before-branching.md) — 작업 브랜치 생성 전 git fetch, 캐시된 origin/main 믿지 말 것, 뒤처진 브랜치는 머지로 업데이트
+- [이력 압축 크로스 리뷰](project-history-compression-cross-review.md) — health↔dream 장점 상호 이식 완료(2026-08-14), 양쪽 미커밋, dream 상세는 그쪽 memory 참조

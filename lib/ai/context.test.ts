@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildSystemPrompt } from "./context";
+import { MAX_CUSTOM_PROMPT_CHARS } from "@/lib/relay-limits";
+import { buildSystemPrompt, PROMPT_CONTEXT_LIMITS, trimContextForPrompt } from "./context";
 import type { UserContext } from "./types";
 
 const BASE: UserContext = {
@@ -97,5 +98,85 @@ describe("buildSystemPrompt", () => {
         const p = buildSystemPrompt(BASE);
         expect(p).toContain("현재 식재료로 만들 수 있는 실제 식단");
         expect(p).not.toContain("절대 포함하지 마세요");
+    });
+});
+
+describe("trimContextForPrompt", () => {
+    it("상한 내 컨텍스트는 그대로 유지한다", () => {
+        expect(trimContextForPrompt(BASE)).toEqual(BASE);
+    });
+
+    it("배열·문자열을 상한 내로 잘라낸다", () => {
+        const L = PROMPT_CONTEXT_LIMITS;
+        const bloated: UserContext = {
+            ...BASE,
+            recentMetrics: Array.from({ length: 200 }, (_, i) => ({
+                date: `2026-06-27-비정상적으로-긴-날짜-문자열-${i}`,
+                weight: 74,
+            })),
+            ingredients: Array.from({ length: 500 }, (_, i) => ({
+                name: `식재료-${"가".repeat(100)}-${i}`,
+                category: "etc" as const,
+            })),
+            recentMealSummaries: Array.from({ length: 50 }, () => "요약 ".repeat(500)),
+        };
+        const trimmed = trimContextForPrompt(bloated);
+        expect(trimmed.recentMetrics.length).toBe(L.maxRecentMetrics);
+        expect(trimmed.goals.length).toBeLessThanOrEqual(5);
+        expect(trimmed.ingredients.length).toBe(L.maxIngredients);
+        expect(trimmed.recentMealSummaries.length).toBe(L.maxRecentMealSummaries);
+        for (const m of trimmed.recentMetrics) expect(m.date.length).toBeLessThanOrEqual(L.maxMetricDateLength);
+        for (const i of trimmed.ingredients) expect(i.name.length).toBeLessThanOrEqual(L.maxIngredientNameLength);
+        for (const s of trimmed.recentMealSummaries) expect(s.length).toBeLessThanOrEqual(L.maxSummaryLength);
+    });
+
+    it("직렬화가 긴 숫자는 소수 2자리로 반올림한다 (프롬프트 길이 통제)", () => {
+        const trimmed = trimContextForPrompt({
+            ...BASE,
+            recentMetrics: [{ date: "2026-08-14", weight: 74.99999999999994, bodyFatPct: 21.550000000000001 }],
+        });
+        expect(trimmed.recentMetrics[0].weight).toBe(75);
+        expect(trimmed.recentMetrics[0].bodyFatPct).toBe(21.55);
+        expect(String(trimmed.recentMetrics[0].weight).length).toBeLessThanOrEqual(6);
+    });
+
+    it("식재료는 최신 항목(뒤쪽)을 보존한다 — addedAt 오름차순 입력", () => {
+        const L = PROMPT_CONTEXT_LIMITS;
+        const ingredients = Array.from({ length: 500 }, (_, i) => ({
+            name: `재료${i}`,
+            category: "etc" as const,
+        }));
+        const trimmed = trimContextForPrompt({ ...BASE, ingredients });
+        expect(trimmed.ingredients.length).toBe(L.maxIngredients);
+        // 가장 최근에 추가된 항목이 남고, 가장 오래된 항목이 잘려나간다
+        expect(trimmed.ingredients.at(-1)?.name).toBe("재료499");
+        expect(trimmed.ingredients[0]?.name).toBe(`재료${500 - L.maxIngredients}`);
+    });
+
+    it("상한까지 채운 최악 케이스에서도 systemPrompt가 relay 상한을 넘지 않는다", () => {
+        const L = PROMPT_CONTEXT_LIMITS;
+        const worst: UserContext = {
+            gender: "female",
+            goals: ["lose-weight", "gain-weight", "maintain-weight", "lean-mass", "health"],
+            heightCm: 200.55,
+            weightKg: 499.99,
+            recentMetrics: Array.from({ length: L.maxRecentMetrics }, () => ({
+                date: "가".repeat(L.maxMetricDateLength),
+                weight: 499.99,
+                bodyFatPct: 69.99,
+                skeletalMuscleMass: 99.99,
+            })),
+            ingredients: Array.from({ length: L.maxIngredients }, (_, i) => ({
+                name: "가".repeat(L.maxIngredientNameLength),
+                // 카테고리를 분산시켜 그룹 라벨 줄 수를 최대로
+                category: (["vegetable-fruit", "protein", "grain", "dairy", "seasoning", "etc"] as const)[i % 6],
+            })),
+            recentMealSummaries: Array.from({ length: L.maxRecentMealSummaries }, () =>
+                "가".repeat(L.maxSummaryLength),
+            ),
+            mealPlanMode: "pantry-only",
+        };
+        const p = buildSystemPrompt(trimContextForPrompt(worst));
+        expect(p.length).toBeLessThanOrEqual(MAX_CUSTOM_PROMPT_CHARS);
     });
 });
