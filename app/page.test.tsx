@@ -77,9 +77,9 @@ const MODELS_RESPONSE = {
 };
 
 const PLENTIFUL_INGREDIENTS = [
-    { id: "i1", name: "닭가슴살", category: "protein" as const, addedAt: "" },
-    { id: "i2", name: "브로콜리", category: "vegetable-fruit" as const, addedAt: "" },
-    { id: "i3", name: "현미", category: "grain" as const, addedAt: "" },
+    { id: "i1", name: "닭가슴살", addedAt: "" },
+    { id: "i2", name: "브로콜리", addedAt: "" },
+    { id: "i3", name: "현미", addedAt: "" },
 ];
 
 function makeConversation(overrides: Partial<Conversation> = {}): Conversation {
@@ -462,9 +462,7 @@ describe("ChatPage", () => {
         beforeEach(() => {
             vi.mocked(getUserProfile).mockResolvedValue(MOCK_PROFILE);
             // 부족 상태: 3개 미만
-            vi.mocked(getAllIngredients).mockResolvedValue([
-                { id: "i1", name: "계란", category: "protein", addedAt: "" },
-            ]);
+            vi.mocked(getAllIngredients).mockResolvedValue([{ id: "i1", name: "계란", addedAt: "" }]);
         });
 
         async function renderAndWaitInput() {

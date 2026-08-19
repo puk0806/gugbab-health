@@ -19,10 +19,10 @@ describe("IngredientsPage", () => {
         vi.mocked(addIngredient).mockClear();
     });
 
-    it("renders add form with name input and category select", async () => {
+    it("renders add form with name input only (카테고리 폐지)", async () => {
         render(<IngredientsPage />);
         expect(screen.getByRole("textbox", { name: "식재료 이름" })).toBeInTheDocument();
-        expect(screen.getByRole("combobox", { name: "카테고리" })).toBeInTheDocument();
+        expect(screen.queryByRole("combobox", { name: "카테고리" })).not.toBeInTheDocument();
         expect(screen.getByRole("button", { name: "추가" })).toBeInTheDocument();
     });
 
@@ -45,7 +45,6 @@ describe("IngredientsPage", () => {
         vi.mocked(addIngredient).mockResolvedValue({
             id: "01",
             name: "당근",
-            category: "vegetable-fruit",
             addedAt: "",
         });
 
@@ -56,5 +55,7 @@ describe("IngredientsPage", () => {
         fireEvent.click(screen.getByRole("button", { name: "추가" }));
 
         await waitFor(() => expect(screen.getByText("당근")).toBeInTheDocument());
+        // 이름만 인자로 전달 — 카테고리 인자 폐지
+        expect(vi.mocked(addIngredient)).toHaveBeenCalledWith("당근");
     });
 });

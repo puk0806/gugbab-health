@@ -2,8 +2,6 @@ export type Gender = "male" | "female";
 
 export type Goal = "lose-weight" | "gain-weight" | "maintain-weight" | "lean-mass" | "health";
 
-export type IngredientCategory = "vegetable-fruit" | "protein" | "grain" | "dairy" | "seasoning" | "etc";
-
 export interface UserProfile {
     id: string;
     gender: Gender;
@@ -17,7 +15,6 @@ export interface UserProfile {
 export interface Ingredient {
     id: string;
     name: string;
-    category: IngredientCategory;
     addedAt: string;
 }
 

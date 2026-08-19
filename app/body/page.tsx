@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import BottomNav from "@/components/layout/BottomNav";
-import { BODY_LIMITS, rangeErrorMessage } from "@/lib/ai/limits";
+import { BODY_LIMITS, floor1, muscleConsistencyError, rangeErrorMessage } from "@/lib/ai/limits";
 import { addBodyMetric, deleteBodyMetric, getLatestBodyMetrics } from "@/lib/db/bodyMetrics";
 import { getLocalDateString } from "@/lib/db/index";
 import type { BodyMetric } from "@/lib/db/types";
@@ -30,7 +30,17 @@ export default function BodyPage() {
 
     const weightError = rangeErrorMessage(weight, BODY_LIMITS.weightKg);
     const bodyFatError = rangeErrorMessage(bodyFat, BODY_LIMITS.bodyFatPct);
-    const muscleError = rangeErrorMessage(muscleMass, BODY_LIMITS.skeletalMuscleKg);
+    const muscleRangeError = rangeErrorMessage(muscleMass, BODY_LIMITS.skeletalMuscleKg);
+    // 필드 간 물리적 정합성 — 각 값이 개별 범위를 통과한 뒤에만 판정한다
+    const muscleError =
+        muscleRangeError ||
+        (weightError || bodyFatError || weight.trim() === ""
+            ? ""
+            : muscleConsistencyError(
+                  floor1(Number(weight)),
+                  muscleMass.trim() ? floor1(Number(muscleMass)) : undefined,
+                  bodyFat.trim() ? floor1(Number(bodyFat)) : undefined,
+              ));
     const hasError = weightError !== "" || bodyFatError !== "" || muscleError !== "";
 
     async function handleDelete(id: string) {
@@ -50,9 +60,10 @@ export default function BodyPage() {
 
     async function handleSave() {
         if (!weight.trim() || hasError) return;
-        const w = Number(weight);
-        const bf = bodyFat.trim() ? Number(bodyFat) : undefined;
-        const mm = muscleMass.trim() ? Number(muscleMass) : undefined;
+        // 소수점 첫째 자리까지만 저장 — 측정기 표기 정밀도를 넘는 잡값은 버린다
+        const w = floor1(Number(weight));
+        const bf = bodyFat.trim() ? floor1(Number(bodyFat)) : undefined;
+        const mm = muscleMass.trim() ? floor1(Number(muscleMass)) : undefined;
         setSaving(true);
         try {
             const metric = await addBodyMetric({
@@ -155,12 +166,13 @@ export default function BodyPage() {
                         {[...records].reverse().map((r) => (
                             <li key={r.id} className={styles.record}>
                                 <span className={styles.recordDate}>{r.date}</span>
-                                <span className={styles.recordWeight}>{r.weight} kg</span>
+                                {/* floor1 표시 — 정규화 이전에 저장된 긴 소수 기록도 일관되게 보이도록 */}
+                                <span className={styles.recordWeight}>{floor1(r.weight)} kg</span>
                                 {r.bodyFatPct !== undefined && (
-                                    <span className={styles.recordSub}>체지방 {r.bodyFatPct}%</span>
+                                    <span className={styles.recordSub}>체지방 {floor1(r.bodyFatPct)}%</span>
                                 )}
                                 {r.skeletalMuscleMass !== undefined && (
-                                    <span className={styles.recordSub}>골격근 {r.skeletalMuscleMass} kg</span>
+                                    <span className={styles.recordSub}>골격근 {floor1(r.skeletalMuscleMass)} kg</span>
                                 )}
                                 <button
                                     type="button"

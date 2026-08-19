@@ -3,27 +3,13 @@
 import { useEffect, useState } from "react";
 import BottomNav from "@/components/layout/BottomNav";
 import { addIngredient, deleteIngredient, getAllIngredients } from "@/lib/db/ingredients";
-import type { Ingredient, IngredientCategory } from "@/lib/db/types";
+import type { Ingredient } from "@/lib/db/types";
 import styles from "./page.module.css";
-
-const CATEGORIES: { value: IngredientCategory; label: string }[] = [
-    { value: "vegetable-fruit", label: "채소·과일" },
-    { value: "protein", label: "단백질" },
-    { value: "grain", label: "곡류" },
-    { value: "dairy", label: "유제품" },
-    { value: "seasoning", label: "양념·소스" },
-    { value: "etc", label: "기타" },
-];
-
-function categoryLabel(category: IngredientCategory): string {
-    return CATEGORIES.find((c) => c.value === category)?.label ?? category;
-}
 
 export default function IngredientsPage() {
     const [items, setItems] = useState<Ingredient[]>([]);
     const [loadingItems, setLoadingItems] = useState(true);
     const [name, setName] = useState("");
-    const [category, setCategory] = useState<IngredientCategory>("vegetable-fruit");
     const [adding, setAdding] = useState(false);
 
     useEffect(() => {
@@ -43,7 +29,7 @@ export default function IngredientsPage() {
         if (!trimmed) return;
         setAdding(true);
         try {
-            const item = await addIngredient(trimmed, category);
+            const item = await addIngredient(trimmed);
             setItems((prev) => [...prev, item]);
             setName("");
         } finally {
@@ -77,18 +63,6 @@ export default function IngredientsPage() {
                     onChange={(e) => setName(e.target.value)}
                     aria-label="식재료 이름"
                 />
-                <select
-                    className={styles.select}
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as IngredientCategory)}
-                    aria-label="카테고리"
-                >
-                    {CATEGORIES.map(({ value, label }) => (
-                        <option key={value} value={value}>
-                            {label}
-                        </option>
-                    ))}
-                </select>
                 <button type="submit" className={styles.addBtn} disabled={!name.trim() || adding}>
                     추가
                 </button>
@@ -100,10 +74,7 @@ export default function IngredientsPage() {
                 <ul className={styles.list}>
                     {items.map((item) => (
                         <li key={item.id} className={styles.item}>
-                            <div>
-                                <span className={styles.itemName}>{item.name}</span>
-                                <span className={styles.badge}>{categoryLabel(item.category)}</span>
-                            </div>
+                            <span className={styles.itemName}>{item.name}</span>
                             <button
                                 type="button"
                                 className={styles.deleteBtn}

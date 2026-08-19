@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { InstallSection } from "@/components/install/InstallSection";
-import { BODY_LIMITS, rangeErrorMessage } from "@/lib/ai/limits";
+import { BODY_LIMITS, floor1, muscleConsistencyError, rangeErrorMessage } from "@/lib/ai/limits";
 import { addBodyMetric } from "@/lib/db/bodyMetrics";
 import type { Gender, Goal } from "@/lib/db/types";
 import { saveUserProfile } from "@/lib/db/userProfile";
@@ -30,11 +30,20 @@ export default function OnboardingPage() {
     const heightError = rangeErrorMessage(height, BODY_LIMITS.heightCm);
     const weightError = rangeErrorMessage(weight, BODY_LIMITS.weightKg);
     const bodyFatError = rangeErrorMessage(bodyFat, BODY_LIMITS.bodyFatPct);
-    const muscleError = rangeErrorMessage(muscleMass, BODY_LIMITS.skeletalMuscleKg);
+    const muscleRangeError = rangeErrorMessage(muscleMass, BODY_LIMITS.skeletalMuscleKg);
+    // 필드 간 물리적 정합성 — 각 값이 개별 범위를 통과한 뒤에만 판정한다
+    const muscleError =
+        muscleRangeError ||
+        (weightError || bodyFatError || weight.trim() === ""
+            ? ""
+            : muscleConsistencyError(
+                  floor1(Number(weight)),
+                  muscleMass.trim() ? floor1(Number(muscleMass)) : undefined,
+                  bodyFat.trim() ? floor1(Number(bodyFat)) : undefined,
+              ));
     const hasError = [heightError, weightError, bodyFatError, muscleError].some((e) => e !== "");
     // 키·몸무게는 필수, 체지방률·골격근량은 선택
-    const requiredFilled =
-        gender !== null && goals.length > 0 && height.trim() !== "" && weight.trim() !== "";
+    const requiredFilled = gender !== null && goals.length > 0 && height.trim() !== "" && weight.trim() !== "";
 
     function toggleGoal(goal: Goal) {
         setGoals((prev) => (prev.includes(goal) ? prev.filter((g) => g !== goal) : [...prev, goal]));
@@ -44,17 +53,18 @@ export default function OnboardingPage() {
         if (!gender || !requiredFilled || hasError) return;
         setSaving(true);
         try {
+            // 소수점 첫째 자리까지만 저장 — 측정기 표기 정밀도를 넘는 잡값은 버린다
             await saveUserProfile({
                 gender,
                 goals,
-                heightCm: Number(height),
-                weightKg: Number(weight),
+                heightCm: floor1(Number(height)),
+                weightKg: floor1(Number(weight)),
             });
             // 입력받은 신체 수치를 첫 지표 기록으로 남긴다 — 실패해도 온보딩은 계속
             await addBodyMetric({
-                weight: Number(weight),
-                ...(bodyFat.trim() ? { bodyFatPct: Number(bodyFat) } : {}),
-                ...(muscleMass.trim() ? { skeletalMuscleMass: Number(muscleMass) } : {}),
+                weight: floor1(Number(weight)),
+                ...(bodyFat.trim() ? { bodyFatPct: floor1(Number(bodyFat)) } : {}),
+                ...(muscleMass.trim() ? { skeletalMuscleMass: floor1(Number(muscleMass)) } : {}),
             }).catch(() => undefined);
             router.push("/");
         } finally {

@@ -24,7 +24,6 @@ const MetricSchema = z.object({
 
 const IngredientSchema = z.object({
     name: z.string(),
-    category: z.enum(["vegetable-fruit", "protein", "grain", "dairy", "seasoning", "etc"]),
 });
 
 const UserContextSchema = z.object({

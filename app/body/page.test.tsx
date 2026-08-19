@@ -83,6 +83,49 @@ describe("BodyPage", () => {
             expect(screen.getByRole("button", { name: "저장" })).toBeDisabled();
         });
 
+        it("골격근량이 체중보다 크면 에러 표시", () => {
+            render(<BodyPage />);
+            fireEvent.change(screen.getByLabelText(/체중/), { target: { value: "50" } });
+            fireEvent.change(screen.getByLabelText(/골격근량/), { target: { value: "90" } });
+
+            expect(screen.getByText("골격근량은 체중보다 클 수 없어요")).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: "저장" })).toBeDisabled();
+        });
+
+        it("체지방률 입력 시 제지방량을 골격근량 상한으로 본다", () => {
+            render(<BodyPage />);
+            fireEvent.change(screen.getByLabelText(/체중/), { target: { value: "70" } });
+            fireEvent.change(screen.getByLabelText(/체지방률/), { target: { value: "30" } });
+            fireEvent.change(screen.getByLabelText(/골격근량/), { target: { value: "55" } });
+
+            // 제지방량 49kg 초과 — 안내 문구에 계산된 상한이 포함된다
+            expect(screen.getByText(/제지방량\(49kg\)/)).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: "저장" })).toBeDisabled();
+        });
+
+        it("체중 미입력 상태의 골격근량은 오탐 에러를 내지 않는다", () => {
+            render(<BodyPage />);
+            fireEvent.change(screen.getByLabelText(/골격근량/), { target: { value: "35" } });
+
+            expect(screen.queryByText("골격근량은 체중보다 클 수 없어요")).not.toBeInTheDocument();
+        });
+
+        it("소수점 둘째 자리 이하를 버려서 저장한다 (반올림 아님)", async () => {
+            render(<BodyPage />);
+            fireEvent.change(screen.getByLabelText(/체중/), { target: { value: "70.99" } });
+            fireEvent.change(screen.getByLabelText(/체지방률/), { target: { value: "30.55" } });
+            fireEvent.change(screen.getByLabelText(/골격근량/), { target: { value: "33.789" } });
+            fireEvent.click(screen.getByRole("button", { name: "저장" }));
+
+            await waitFor(() =>
+                expect(addBodyMetric).toHaveBeenCalledWith({
+                    weight: 70.9,
+                    bodyFatPct: 30.5,
+                    skeletalMuscleMass: 33.7,
+                }),
+            );
+        });
+
         it("에러를 고치면 저장 버튼이 다시 활성화된다", () => {
             render(<BodyPage />);
             fireEvent.change(screen.getByLabelText(/체중/), { target: { value: "501" } });

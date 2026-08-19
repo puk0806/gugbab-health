@@ -187,7 +187,7 @@ export default function ChatPage() {
                         bodyFatPct: sanitizeBodyValue(m.bodyFatPct, BODY_LIMITS.bodyFatPct),
                         skeletalMuscleMass: sanitizeBodyValue(m.skeletalMuscleMass, BODY_LIMITS.skeletalMuscleKg),
                     })),
-                ingredients: ingredients.map((i) => ({ name: i.name, category: i.category })),
+                ingredients: ingredients.map((i) => ({ name: i.name })),
                 recentMealSummaries: [],
             });
             if (latest) {

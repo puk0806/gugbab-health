@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { InstallSection } from "@/components/install/InstallSection";
 import BottomNav from "@/components/layout/BottomNav";
-import { BODY_LIMITS, isInRange, rangeErrorMessage } from "@/lib/ai/limits";
+import { BODY_LIMITS, floor1, isInRange, rangeErrorMessage } from "@/lib/ai/limits";
 import type { Gender, Goal, UserProfile } from "@/lib/db/types";
 import { getUserProfile, saveUserProfile } from "@/lib/db/userProfile";
 import styles from "./page.module.css";
@@ -18,8 +18,9 @@ const GOAL_LABELS: Record<Goal, string> = {
 
 const GOALS = Object.entries(GOAL_LABELS) as [Goal, string][];
 
+// 소수점 첫째 자리까지만 저장 — 측정기 표기 정밀도를 넘는 잡값은 버린다
 function parseValidated(value: string): number | undefined {
-    return value.trim() === "" ? undefined : Number(value);
+    return value.trim() === "" ? undefined : floor1(Number(value));
 }
 
 export default function SettingsPage() {
@@ -166,9 +167,7 @@ export default function SettingsPage() {
                                 {weightError && <span className={styles.fieldError}>{weightError}</span>}
                             </div>
                         </div>
-                        <p className={styles.fieldHint}>
-                            신체 지표 기록이 없을 때 식단 추천의 기준으로 사용돼요.
-                        </p>
+                        <p className={styles.fieldHint}>신체 지표 기록이 없을 때 식단 추천의 기준으로 사용돼요.</p>
                     </section>
 
                     <button
@@ -180,10 +179,7 @@ export default function SettingsPage() {
                         {saving ? "저장 중..." : "저장"}
                     </button>
 
-                    <InstallSection
-                        title="앱 설치"
-                        description="홈 화면에 추가하면 앱처럼 빠르게 실행할 수 있어요."
-                    />
+                    <InstallSection title="앱 설치" description="홈 화면에 추가하면 앱처럼 빠르게 실행할 수 있어요." />
                 </div>
             )}
 

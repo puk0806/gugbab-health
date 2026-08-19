@@ -1,4 +1,4 @@
-import type { Gender, Goal, IngredientCategory } from "@/lib/db/types";
+import type { Gender, Goal } from "@/lib/db/types";
 
 // relay API 계약 타입 — 단일 소스는 @gugbab/relay-types (OpenAPI 생성)
 export type { ModelAlias, ModelInfo, ModelsResponse } from "@gugbab/relay-types";
@@ -12,7 +12,6 @@ export interface MetricContext {
 
 export interface IngredientContext {
     name: string;
-    category: IngredientCategory;
 }
 
 export type MealPlanMode = "pantry-only" | "free";
