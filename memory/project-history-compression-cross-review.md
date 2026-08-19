@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ab20dba6-df2f-4b12-a539-1a28bb20553a
-  modified: 2026-08-17T23:59:12.469Z
+  modified: 2026-08-18T06:54:28.874Z
 ---
 
 2026-08-14, relay 입력 상한 대응(wantSummary 이력 압축)을 health와
@@ -48,6 +48,12 @@ KEEP_RECENT_TURNS 3. 교훈: 스크래치 디렉토리에서 pnpm add가 실행�
 
 검증: health 테스트 232개·dream 115개 전부 통과, 양쪽 tsc 클린, Codex 최종
 라운드 무지적 수렴 (2026-08-18).
+
+**종결 (2026-08-18)**: health는 PR #16으로 main 머지·Vercel Production 배포
+완료. 프로덕션 실측 — 신규 검증(기형 이력·범위 밖 지표) 400 동작, 실채팅
+SSE·summary 수신, 압축 형태 17개 멀티턴 이력 정상 응답까지 확인. dream도
+자체 세션에서 수렴 종결 선언. 크로스 포팅은 이후 handoff 문서로만 진행
+(ad-hoc 스윕 금지 — dream memory의 재발 방지 규칙 참조).
 양쪽 모두 미커밋 상태 — dream은 `feature/relay-input-limits` 브랜치(그쪽 세션의
 기존 미커밋 변경 위), health는 main 워킹 트리. 커밋은 사용자 요청 대기.
 
