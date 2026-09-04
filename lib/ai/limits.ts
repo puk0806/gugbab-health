@@ -19,6 +19,42 @@ export interface NumberRange {
     max: number;
 }
 
+/**
+ * 소수점 첫째 자리까지 남기고 버림 (21.59 → 21.5).
+ * 체중계·인바디 표기 정밀도가 0.1 단위라 그 이상은 의미 없는 잡값이다.
+ * `n * 10`의 부동소수 오차(21.5 * 10 = 214.99999999999997)를 보정해
+ * 정확히 떨어지는 값이 한 단계 깎이는 것을 막는다.
+ */
+export function floor1(value: number): number {
+    if (!Number.isFinite(value)) return value;
+    return Math.floor(Number((value * 10).toFixed(6))) / 10;
+}
+
+/**
+ * 골격근량의 물리적 상한 — 골격근은 제지방량의 부분집합이다.
+ * 체지방률을 알면 제지방량(체중 × (1 − 체지방률/100)), 모르면 체중이 상한.
+ */
+export function maxSkeletalMuscleKg(weightKg: number, bodyFatPct?: number): number {
+    if (bodyFatPct === undefined) return weightKg;
+    return floor1(weightKg * (1 - bodyFatPct / 100));
+}
+
+/**
+ * 골격근량이 물리적으로 가능한 값인지 검증 — 위반 시 사용자 안내 문구, 정상이면 빈 문자열.
+ * 체중이 없거나 골격근량 미입력이면 검증 대상 아님(빈 문자열).
+ */
+export function muscleConsistencyError(weightKg: number, muscleKg?: number, bodyFatPct?: number): string {
+    if (muscleKg === undefined || !Number.isFinite(weightKg)) return "";
+    if (muscleKg > weightKg) return "골격근량은 체중보다 클 수 없어요";
+    if (bodyFatPct !== undefined) {
+        const limit = maxSkeletalMuscleKg(weightKg, bodyFatPct);
+        if (muscleKg > limit) {
+            return `체지방률 ${bodyFatPct}% 기준 제지방량(${limit}kg)을 넘을 수 없어요`;
+        }
+    }
+    return "";
+}
+
 export function isInRange(value: number, range: NumberRange): boolean {
     return Number.isFinite(value) && value >= range.min && value <= range.max;
 }

@@ -10,7 +10,7 @@ interface HealthDB extends DBSchema {
     ingredients: {
         key: string;
         value: Ingredient;
-        indexes: { byCategory: string; byAddedAt: string };
+        indexes: { byAddedAt: string };
     };
     bodyMetrics: {
         key: string;
@@ -41,9 +41,9 @@ async function migrateMealHistoryToConversations(
     tx: IDBPTransaction<HealthDB, StoreNames<HealthDB>[], "versionchange">,
 ): Promise<void> {
     // 구 스토어는 현행 스키마 타입에 없음 — 마이그레이션 경계에서만 타입 우회 접근
-    const legacyStore = (
-        tx.objectStore as unknown as (name: string) => { getAll(): Promise<LegacyMealHistory[]> }
-    )("mealHistory");
+    const legacyStore = (tx.objectStore as unknown as (name: string) => { getAll(): Promise<LegacyMealHistory[]> })(
+        "mealHistory",
+    );
     const rows = await legacyStore.getAll();
     const convStore = tx.objectStore("conversations");
     for (const h of rows) {
@@ -60,7 +60,7 @@ async function migrateMealHistoryToConversations(
 }
 
 const DB_NAME = "gugbab-health";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise: Promise<IDBPDatabase<HealthDB>> | null = null;
 
@@ -76,7 +76,6 @@ export function getDB(): Promise<IDBPDatabase<HealthDB>> {
                     const ingredientStore = db.createObjectStore("ingredients", {
                         keyPath: "id",
                     });
-                    ingredientStore.createIndex("byCategory", "category");
                     ingredientStore.createIndex("byAddedAt", "addedAt");
                 }
 
@@ -97,6 +96,15 @@ export function getDB(): Promise<IDBPDatabase<HealthDB>> {
                 // v1 → v2: 하루 1건 mealHistory를 대화방으로 이관 후 구 스토어 제거
                 if (db.objectStoreNames.contains("mealHistory" as never)) {
                     await migrateMealHistoryToConversations(db, tx);
+                }
+
+                // v2 → v3: 식재료 카테고리 폐지 — 인덱스 제거.
+                // 기존 레코드의 category 값은 읽지 않으므로 그대로 두어도 무해하다
+                if (db.objectStoreNames.contains("ingredients")) {
+                    const store = tx.objectStore("ingredients");
+                    if (store.indexNames.contains("byCategory" as never)) {
+                        store.deleteIndex("byCategory" as never);
+                    }
                 }
             },
         }).catch((err: unknown) => {

@@ -7,10 +7,7 @@ const BASE: UserContext = {
     gender: "male",
     goals: ["lose-weight", "lean-mass"],
     recentMetrics: [{ date: "2026-06-27", weight: 74, bodyFatPct: 21.5, skeletalMuscleMass: 35.2 }],
-    ingredients: [
-        { name: "닭가슴살", category: "protein" },
-        { name: "브로콜리", category: "vegetable-fruit" },
-    ],
+    ingredients: [{ name: "닭가슴살" }, { name: "브로콜리" }],
     recentMealSummaries: [],
 };
 
@@ -29,12 +26,10 @@ describe("buildSystemPrompt", () => {
         expect(p).toContain("35.2kg");
     });
 
-    it("식재료를 카테고리별로 포함한다", () => {
+    it("식재료를 평면 목록으로 포함한다 (카테고리 그룹핑 없음)", () => {
         const p = buildSystemPrompt(BASE);
-        expect(p).toContain("닭가슴살");
-        expect(p).toContain("브로콜리");
-        expect(p).toContain("단백질");
-        expect(p).toContain("채소·과일");
+        expect(p).toContain("- 닭가슴살");
+        expect(p).toContain("- 브로콜리");
     });
 
     it("식재료 없으면 없음 메시지", () => {
@@ -116,7 +111,6 @@ describe("trimContextForPrompt", () => {
             })),
             ingredients: Array.from({ length: 500 }, (_, i) => ({
                 name: `식재료-${"가".repeat(100)}-${i}`,
-                category: "etc" as const,
             })),
             recentMealSummaries: Array.from({ length: 50 }, () => "요약 ".repeat(500)),
         };
@@ -130,13 +124,17 @@ describe("trimContextForPrompt", () => {
         for (const s of trimmed.recentMealSummaries) expect(s.length).toBeLessThanOrEqual(L.maxSummaryLength);
     });
 
-    it("직렬화가 긴 숫자는 소수 2자리로 반올림한다 (프롬프트 길이 통제)", () => {
+    it("직렬화가 긴 숫자는 소수 1자리로 버린다 (앱 입력 정규화와 동일 기준)", () => {
         const trimmed = trimContextForPrompt({
             ...BASE,
-            recentMetrics: [{ date: "2026-08-14", weight: 74.99999999999994, bodyFatPct: 21.550000000000001 }],
+            recentMetrics: [
+                // 74.99999999999994는 75의 부동소수 잡음 — 보정되어 75
+                { date: "2026-08-14", weight: 74.99999999999994, bodyFatPct: 21.59, skeletalMuscleMass: 33.333 },
+            ],
         });
         expect(trimmed.recentMetrics[0].weight).toBe(75);
-        expect(trimmed.recentMetrics[0].bodyFatPct).toBe(21.55);
+        expect(trimmed.recentMetrics[0].bodyFatPct).toBe(21.5);
+        expect(trimmed.recentMetrics[0].skeletalMuscleMass).toBe(33.3);
         expect(String(trimmed.recentMetrics[0].weight).length).toBeLessThanOrEqual(6);
     });
 
@@ -144,7 +142,6 @@ describe("trimContextForPrompt", () => {
         const L = PROMPT_CONTEXT_LIMITS;
         const ingredients = Array.from({ length: 500 }, (_, i) => ({
             name: `재료${i}`,
-            category: "etc" as const,
         }));
         const trimmed = trimContextForPrompt({ ...BASE, ingredients });
         expect(trimmed.ingredients.length).toBe(L.maxIngredients);
@@ -166,10 +163,8 @@ describe("trimContextForPrompt", () => {
                 bodyFatPct: 69.99,
                 skeletalMuscleMass: 99.99,
             })),
-            ingredients: Array.from({ length: L.maxIngredients }, (_, i) => ({
+            ingredients: Array.from({ length: L.maxIngredients }, () => ({
                 name: "가".repeat(L.maxIngredientNameLength),
-                // 카테고리를 분산시켜 그룹 라벨 줄 수를 최대로
-                category: (["vegetable-fruit", "protein", "grain", "dairy", "seasoning", "etc"] as const)[i % 6],
             })),
             recentMealSummaries: Array.from({ length: L.maxRecentMealSummaries }, () =>
                 "가".repeat(L.maxSummaryLength),

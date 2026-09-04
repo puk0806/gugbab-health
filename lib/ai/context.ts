@@ -1,4 +1,5 @@
 import { uniq } from "@gugbab/utils";
+import { floor1 } from "./limits";
 import type { UserContext } from "./types";
 
 /**
@@ -16,11 +17,9 @@ export const PROMPT_CONTEXT_LIMITS = {
     maxSummaryLength: 500, // relay 요약 계약(300자 이내)의 여유 상한
 } as const;
 
-// 소수 2자리 반올림 — JS 숫자는 직렬화가 최대 24자까지 길어질 수 있어
-// (예: 499.99999999999994) 프롬프트 길이 상한 보장을 깨뜨린다
-function round2(n: number): number {
-    return Math.round(n * 100) / 100;
-}
+// 소수 1자리 버림 — 앱 입력 정규화(floor1)와 동일 기준.
+// JS 숫자는 직렬화가 최대 24자까지 길어질 수 있어(예: 499.99999999999994)
+// 프롬프트 길이 상한 보장을 깨뜨리므로, 정규화 이전 저장분도 여기서 정리한다
 
 /** 프롬프트 생성 전 컨텍스트 배열·문자열·숫자 정밀도를 상한 내로 잘라낸다 */
 export function trimContextForPrompt(ctx: UserContext): UserContext {
@@ -32,9 +31,9 @@ export function trimContextForPrompt(ctx: UserContext): UserContext {
         recentMetrics: ctx.recentMetrics.slice(0, L.maxRecentMetrics).map((m) => ({
             ...m,
             date: m.date.slice(0, L.maxMetricDateLength),
-            weight: round2(m.weight),
-            ...(m.bodyFatPct !== undefined ? { bodyFatPct: round2(m.bodyFatPct) } : {}),
-            ...(m.skeletalMuscleMass !== undefined ? { skeletalMuscleMass: round2(m.skeletalMuscleMass) } : {}),
+            weight: floor1(m.weight),
+            ...(m.bodyFatPct !== undefined ? { bodyFatPct: floor1(m.bodyFatPct) } : {}),
+            ...(m.skeletalMuscleMass !== undefined ? { skeletalMuscleMass: floor1(m.skeletalMuscleMass) } : {}),
         })),
         // ingredients는 addedAt 오름차순(오래된 것 먼저)으로 오므로 뒤에서 잘라 최신 항목을 보존한다
         ingredients: ctx.ingredients
@@ -52,15 +51,6 @@ const GOAL_LABELS: Record<string, string> = {
     "maintain-weight": "체중 유지",
     "lean-mass": "근육량 증가",
     health: "건강 관리",
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-    "vegetable-fruit": "채소·과일",
-    protein: "단백질",
-    grain: "곡류",
-    dairy: "유제품",
-    seasoning: "양념·소스",
-    etc: "기타",
 };
 
 const MEAL_PLAN_MODE_GUIDES: Record<string, string> = {
@@ -93,17 +83,9 @@ export function buildSystemPrompt(ctx: UserContext): string {
                   .join("\n")
             : "기록 없음";
 
-    const grouped = ctx.ingredients.reduce<Record<string, string[]>>((acc, i) => {
-        const cat = CATEGORY_LABELS[i.category] ?? i.category;
-        (acc[cat] ??= []).push(i.name);
-        return acc;
-    }, {});
+    // 평면 나열 — 분류는 모델이 이미 알고 있어 그룹핑이 정보를 더하지 않는다
     const ingredientsSection =
-        ctx.ingredients.length > 0
-            ? Object.entries(grouped)
-                  .map(([cat, names]) => `- ${cat}: ${names.join(", ")}`)
-                  .join("\n")
-            : "등록된 식재료 없음";
+        ctx.ingredients.length > 0 ? ctx.ingredients.map((i) => `- ${i.name}`).join("\n") : "등록된 식재료 없음";
 
     const mealHistorySection = ctx.recentMealSummaries.length > 0 ? ctx.recentMealSummaries.join("\n") : "없음";
 
