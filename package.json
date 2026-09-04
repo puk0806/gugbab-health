@@ -26,10 +26,10 @@
   },
   "dependencies": {
     "@google/genai": "^1.0.0",
-    "@gugbab/hooks": "1.2.0",
+    "@gugbab/hooks": "1.3.0",
     "@gugbab/styled-radix": "1.0.2",
     "@gugbab/tokens": "1.0.0",
-    "@gugbab/utils": "1.3.0",
+    "@gugbab/utils": "1.4.0",
     "@serwist/next": "^9.5.11",
     "idb": "^8.0.3",
     "next": "16.2.6",

@@ -1,5 +1,5 @@
 /**
- * 마이크 파이프라인 통합 테스트 — lib/speech를 목킹하지 않고
+ * 마이크 파이프라인 통합 테스트 — @gugbab/hooks 실배선을 목킹하지 않고
  * 가짜 window.SpeechRecognition으로 실제 브라우저 이벤트 시퀀스를 재현한다.
  * (유닛 테스트가 speech.ts와 ChatInputBar를 따로 검증하며 놓치는 조합 결함 방지)
  */

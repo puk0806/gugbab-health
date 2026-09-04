@@ -50,7 +50,8 @@ vi.mock("@/components/layout/BottomNav", () => ({
     default: ({ active }: { active: string }) => <nav data-testid="bottom-nav" data-active={active} />,
 }));
 
-vi.mock("@gugbab/hooks", () => ({
+vi.mock("@gugbab/hooks", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@gugbab/hooks")>()),
     useSSEChat: () => ({ ...sseState, send: sendMock, abort: abortMock }),
 }));
 
