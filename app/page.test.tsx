@@ -52,6 +52,17 @@ vi.mock("@/components/layout/BottomNav", () => ({
 
 vi.mock("@gugbab/hooks", () => ({
     useSSEChat: () => ({ ...sseState, send: sendMock, abort: abortMock }),
+    // 음성 인식은 이 화면의 검증 대상이 아니다 — 미지원 상태로 고정해 마이크 UI를 비활성화
+    useSpeechRecognition: () => ({
+        supported: false,
+        listening: false,
+        interimText: "",
+        error: null,
+        start: vi.fn(),
+        stop: vi.fn(),
+        abort: vi.fn(),
+        toggle: vi.fn(),
+    }),
 }));
 
 vi.mock("@/lib/clipboard", () => ({
